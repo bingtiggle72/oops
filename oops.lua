@@ -1,3 +1,6 @@
+repeat
+    task.wait()
+until game:IsLoaded() and game:GetService("Players").LocalPlayer
 
 if game:GetService("CoreGui"):FindFirstChild("HarvestGUI") then
     game:GetService("CoreGui").HarvestGUI:Destroy()
@@ -26,7 +29,7 @@ TitleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 TitleLabel.BorderColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Size = UDim2.new(1, 0, 0, 30)
 TitleLabel.Font = Enum.Font.SourceSansBold
-TitleLabel.Text = "High-Speed Harvest"
+TitleLabel.Text = "Server Lagger"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 18
 
@@ -43,9 +46,9 @@ AmountBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 AmountBox.TextSize = 14
 
 local HarvestButton = Instance.new("TextButton")
-HarvestButton.Name = "HarvestButton"
+HarvestButton.Name = "Harvest"
 HarvestButton.Parent = MainFrame
-HarvestButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+HarvestButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
 HarvestButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
 HarvestButton.Position = UDim2.new(0.05, 0, 0, 70)
 HarvestButton.Size = UDim2.new(0.9, 0, 0, 25)
@@ -62,7 +65,6 @@ local localPlayer = Players.LocalPlayer
 local PLANT_TO_HARVEST = "Tomato"
 local isHarvesting = false
 
--- [NEW & ROBUST] This function waits for the farm to load and checks every plot correctly.
 local function findPlayerFarm()
     local farmsContainer = Workspace:WaitForChild("Farm", 10)
     if not farmsContainer then
@@ -85,8 +87,26 @@ local function findPlayerFarm()
     return nil
 end
 
+local function countItemsInBackpack()
+    local count = 0
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    if not backpack then return 0 end
+
+    for _, item in ipairs(backpack:GetChildren()) do
+        if string.find(item.Name, PLANT_TO_HARVEST) then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function onHarvestButtonClicked()
-    if isHarvesting then return end
+    if isHarvesting then
+        isHarvesting = false
+        HarvestButton.Text = "Start"
+        HarvestButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        return
+    end
 
     local cleanInput = string.gsub(AmountBox.Text, "[,%s]", "")
     local amountToHarvest = tonumber(cleanInput)
@@ -94,23 +114,15 @@ local function onHarvestButtonClicked()
     if not amountToHarvest or amountToHarvest <= 0 then return end
 
     isHarvesting = true
-    HarvestButton.Text = "Finding Farm..."
-    HarvestButton.BackgroundColor3 = Color3.fromRGB(180, 120, 0)
-    task.wait()
+    HarvestButton.Text = "Stop"
+    HarvestButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
     
     local myFarm = findPlayerFarm()
     if not myFarm then
-        HarvestButton.Text = "Farm Not Found"
-        HarvestButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        task.wait(2)
-        HarvestButton.Text = "Start Harvest"
-        HarvestButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
         isHarvesting = false
+        HarvestButton.Text = "Farm Not Found"
         return
     end
-
-    HarvestButton.Text = "Scanning Fruits..."
-    task.wait()
 
     local plantsFolder = myFarm:FindFirstChild("Important", true) and myFarm:FindFirstChild("Plants_Physical", true)
     if not plantsFolder then
@@ -118,45 +130,42 @@ local function onHarvestButtonClicked()
         return
     end
 
-    local promptsToFire = {}
-    for _, plant in ipairs(plantsFolder:GetChildren()) do
-        if plant.Name == PLANT_TO_HARVEST then
-            local fruitsFolder = plant:FindFirstChild("Fruits")
-            if fruitsFolder then
-                for _, fruitModel in ipairs(fruitsFolder:GetChildren()) do
-                    local prompt = fruitModel:FindFirstChild("ProximityPrompt", true)
-                    if prompt then
-                        table.insert(promptsToFire, prompt)
+    local initialCount = countItemsInBackpack()
+    local harvestedCount = 0
+
+    while harvestedCount < amountToHarvest and isHarvesting do
+        local harvestedInThisCycle = false
+        for _, plant in ipairs(plantsFolder:GetChildren()) do
+            if plant.Name == PLANT_TO_HARVEST then
+                local fruitsFolder = plant:FindFirstChild("Fruits")
+                if fruitsFolder then
+                    for _, fruitModel in ipairs(fruitsFolder:GetChildren()) do
+                        local prompt = fruitModel:FindFirstChild("ProximityPrompt", true)
+                        if prompt then
+                            fireproximityprompt(prompt)
+                            harvestedInThisCycle = true
+                            
+                            task.wait() 
+
+                            harvestedCount = countItemsInBackpack() - initialCount
+                            if harvestedCount >= amountToHarvest or not isHarvesting then
+                                break
+                            end
+                        end
                     end
                 end
             end
+            if harvestedCount >= amountToHarvest or not isHarvesting then break end
+        end
+
+        if not harvestedInThisCycle then
+            break 
         end
     end
-
-    if #promptsToFire == 0 then
-        HarvestButton.Text = "No Fruits Found"
-        task.wait(2)
-        HarvestButton.Text = "Start Harvest"
-        HarvestButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-        isHarvesting = false
-        return
-    end
-
-    local numberToFire = math.min(amountToHarvest, #promptsToFire)
-    HarvestButton.Text = "Harvesting..."
-    HarvestButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-    task.wait()
-
-    for i = 1, numberToFire do
-        fireproximityprompt(promptsToFire[i])
-    end
     
-    HarvestButton.Text = "Finished!"
-    task.wait(1)
-    
-    HarvestButton.Text = "Start Harvest"
-    HarvestButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
     isHarvesting = false
+    HarvestButton.Text = "Start"
+    HarvestButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
 end
 
 HarvestButton.MouseButton1Click:Connect(onHarvestButtonClicked)
