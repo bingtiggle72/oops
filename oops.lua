@@ -1,6 +1,3 @@
-repeat
-    task.wait()
-until game:IsLoaded() and game:GetService("Players").LocalPlayer
 
 if game:GetService("CoreGui"):FindFirstChild("HarvestGUI") then
     game:GetService("CoreGui").HarvestGUI:Destroy()
@@ -65,23 +62,27 @@ local localPlayer = Players.LocalPlayer
 local PLANT_TO_HARVEST = "Tomato"
 local isHarvesting = false
 
--- [FIXED] This function now loops through every plot to find yours.
+-- [NEW & ROBUST] This function waits for the farm to load and checks every plot correctly.
 local function findPlayerFarm()
-    local farmsContainer = Workspace:FindFirstChild("Farm")
+    local farmsContainer = Workspace:WaitForChild("Farm", 10)
     if not farmsContainer then
         return nil
     end
 
-    -- Loop through every plot inside the main "Farm" container.
     for _, plot in ipairs(farmsContainer:GetChildren()) do
-        -- Check the specific path for the owner within each plot.
-        local ownerValue = plot:FindFirstChild("Important.Data.Owner", true)
-        if ownerValue and ownerValue.Value == localPlayer.Name then
-            return plot -- Found it. Return this plot.
+        local importantFolder = plot:FindFirstChild("Important")
+        if importantFolder then
+            local dataFolder = importantFolder:FindFirstChild("Data")
+            if dataFolder then
+                local ownerValue = dataFolder:FindFirstChild("Owner")
+                if ownerValue and ownerValue.Value == localPlayer.Name then
+                    return plot
+                end
+            end
         end
     end
     
-    return nil -- If loop finishes, no farm was found.
+    return nil
 end
 
 local function onHarvestButtonClicked()
@@ -90,15 +91,13 @@ local function onHarvestButtonClicked()
     local cleanInput = string.gsub(AmountBox.Text, "[,%s]", "")
     local amountToHarvest = tonumber(cleanInput)
     
-    if not amountToHarvest or amountToHarvest <= 0 then
-        return
-    end
+    if not amountToHarvest or amountToHarvest <= 0 then return end
 
     isHarvesting = true
     HarvestButton.Text = "Finding Farm..."
     HarvestButton.BackgroundColor3 = Color3.fromRGB(180, 120, 0)
     task.wait()
-
+    
     local myFarm = findPlayerFarm()
     if not myFarm then
         HarvestButton.Text = "Farm Not Found"
@@ -110,14 +109,14 @@ local function onHarvestButtonClicked()
         return
     end
 
-    local plantsFolder = myFarm:FindFirstChild("Important.Plants_Physical", true)
+    HarvestButton.Text = "Scanning Fruits..."
+    task.wait()
+
+    local plantsFolder = myFarm:FindFirstChild("Important", true) and myFarm:FindFirstChild("Plants_Physical", true)
     if not plantsFolder then
         isHarvesting = false
         return
     end
-
-    HarvestButton.Text = "Scanning Fruits..."
-    task.wait()
 
     local promptsToFire = {}
     for _, plant in ipairs(plantsFolder:GetChildren()) do
