@@ -65,24 +65,23 @@ local localPlayer = Players.LocalPlayer
 local PLANT_TO_HARVEST = "Tomato"
 local isHarvesting = false
 
+-- [FIXED] This function now loops through every plot to find yours.
 local function findPlayerFarm()
-    local farmContainer = Workspace:FindFirstChild("Farm")
-    if not farmContainer then
+    local farmsContainer = Workspace:FindFirstChild("Farm")
+    if not farmsContainer then
         return nil
     end
 
-    local playerPlot = farmContainer:FindFirstChild("Farm")
-    if not playerPlot then
-        return nil
+    -- Loop through every plot inside the main "Farm" container.
+    for _, plot in ipairs(farmsContainer:GetChildren()) do
+        -- Check the specific path for the owner within each plot.
+        local ownerValue = plot:FindFirstChild("Important.Data.Owner", true)
+        if ownerValue and ownerValue.Value == localPlayer.Name then
+            return plot -- Found it. Return this plot.
+        end
     end
-
-    local ownerValue = playerPlot:FindFirstChild("Important", true) and playerPlot:FindFirstChild("Owner", true)
     
-    if ownerValue and ownerValue.Value == localPlayer.Name then
-        return playerPlot
-    else
-        return nil
-    end
+    return nil -- If loop finishes, no farm was found.
 end
 
 local function onHarvestButtonClicked()
@@ -111,7 +110,7 @@ local function onHarvestButtonClicked()
         return
     end
 
-    local plantsFolder = myFarm:FindFirstChild("Important", true) and myFarm:FindFirstChild("Plants_Physical", true)
+    local plantsFolder = myFarm:FindFirstChild("Important.Plants_Physical", true)
     if not plantsFolder then
         isHarvesting = false
         return
