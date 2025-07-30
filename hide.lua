@@ -1,3 +1,5 @@
+while true do
+task.wait(3)
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
@@ -58,3 +60,4 @@ end
 local playerFarm = farm()
 remove(playerFarm)
 particles()
+end
