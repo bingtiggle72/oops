@@ -1,3 +1,7 @@
+repeat
+    task.wait()
+until game:IsLoaded() and game:GetService("Players").LocalPlayer
+
 while true do
 task.wait(3)
 local Players = game:GetService("Players")
