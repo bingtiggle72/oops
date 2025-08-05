@@ -17,7 +17,7 @@ local HttpService = game:GetService("HttpService")
 
 -- ===================================================================
 -- >> CONFIGURATION <<
-local desiredMutation = "Rainbow" -- <<-- SET YOUR DESIRED MUTATION HERE
+local desiredMutation = "Shiny" -- <<-- SET YOUR DESIRED MUTATION HERE
 local WebhookURL = "https://discord.com/api/webhooks/1371121877145223248/nKBXxzS_wsKjT9WgeFKqhGKjfPuLvDwJwRwE6UghpBpoc_J6MBMWomzOvOHqaDELFX_f" -- <<-- PASTE YOUR WEBHOOK URL HERE
 
 -- ===================================================================
