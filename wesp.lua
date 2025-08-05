@@ -2,14 +2,24 @@ repeat
     task.wait()
 until game:IsLoaded() and game:GetService("Players").LocalPlayer
 
+--[[
+    Script: Pet Mutation Reroller (v5 - Speed Optimized)
+    Description: Uses a fast polling loop to check attributes instantly, minimizing
+                 the delay before rejoining to prevent accidentally claiming the pet.
+]]
+
+-- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
 
 -- ===================================================================
 -- >> CONFIGURATION <<
-local desiredMutation = "Rainbow" -- <<-- CHANGE THIS to your desired mutation
+local desiredMutation = "Rainbow" -- <<-- SET YOUR DESIRED MUTATION HERE
+local WebhookURL = "https://discord.com/api/webhooks/1371121877145223248/nKBXxzS_wsKjT9WgeFKqhGKjfPuLvDwJwRwE6UghpBpoc_J6MBMWomzOvOHqaDELFX_f" -- <<-- PASTE YOUR WEBHOOK URL HERE
+
 -- ===================================================================
 
 -- Variables
@@ -23,74 +33,86 @@ local allMutations = {
     "Ironskin", "Rainbow", "Shocked", "Radiant", "Ascended"
 }
 
--- Function to find and return the mutation from the pet's attributes
-local function getPetMutation(model)
-    print("Checking all attributes for model: " .. model.Name)
-    local allAttributes = model:GetAttributes()
-    
-    -- Loop through every attribute the pet model has
-    for attributeName, attributeValue in pairs(allAttributes) do
-        -- Check if this attribute is one of the known mutations
-        for _, mutation in ipairs(allMutations) do
-            if attributeName == mutation and attributeValue == true then
-                print(" > Found valid mutation attribute: [" .. attributeName .. "]")
-                return attributeName -- Return the name of the mutation found
-            end
-        end
+-- (Webhook function remains the same as before)
+local function sendSuccessWebhook(petName, mutationName)
+    if not WebhookURL or WebhookURL == "YOUR_WEBHOOK_URL_HERE" or WebhookURL == "" then
+        print("Webhook URL is not configured. Skipping notification.")
+        return
     end
-    
-    print(" > No valid mutation attribute was found on the pet.")
-    return nil -- No matching mutation found
+    local Data = {
+        ["embeds"] = {
+            {
+                ["title"] = "Pet Reroller Success!",
+                ["description"] = "You finally got the **" .. mutationName .. "** mutation on your **" .. petName .. "**!",
+                ["color"] = 3066993, -- Green
+                ["footer"] = {["text"] = "Mutation Reroller"}
+            }
+        }
+    }
+    pcall(function() HttpService:PostAsync(WebhookURL, HttpService:JSONEncode(Data)) end)
 end
 
--- Function to handle the pet once it's added to the camera
+-- SPEED-OPTIMIZED function to handle the pet
 local function onPetAdded(descendant)
-    -- We are looking for a Model that is a direct child of the camera
     if descendant:IsA("Model") and descendant.Parent == Camera then
         
-        -- CRITICAL FIX: Wait briefly for the game to set the attributes on the model.
-        -- This prevents the script from checking too early (the race condition).
-        task.wait(0.1) 
+        -- This is the core speed improvement. Instead of a fixed wait,
+        -- we check repeatedly in a very fast loop for up to 0.2 seconds.
+        local startTime = tick()
+        local timeLimit = 0.2 
+        local actualMutation = nil
+
+        while tick() - startTime < timeLimit do
+            -- Loop through all possible mutations to check attributes
+            for _, mutationName in ipairs(allMutations) do
+                if descendant:GetAttribute(mutationName) == true then
+                    -- The moment we find ANY mutation, we know what it is.
+                    actualMutation = mutationName
+                    break -- Exit the inner for-loop
+                end
+            end
+            
+            if actualMutation then
+                break -- A mutation was found, so exit the main while-loop immediately.
+            end
+            
+            task.wait() -- IMPORTANT: Yield for a tiny moment to prevent crashing
+        end
         
-        print("Pet model detected: " .. descendant.Name)
-        
-        local actualMutation = getPetMutation(descendant)
-        
+        -- Decision is made AFTER the fast loop is complete
         if actualMutation then
-            -- A mutation was successfully identified
             if actualMutation == desiredMutation then
-                print("SUCCESS! Desired mutation [" .. desiredMutation .. "] found. Stopping script.")
-                return true -- Signal to disconnect the listener
+                -- SUCCESS: We found the right one!
+                print("SUCCESS! Desired mutation [" .. desiredMutation .. "] found on [" .. descendant.Name .. "].")
+                sendSuccessWebhook(descendant.Name, actualMutation)
             else
-                print("Incorrect mutation. Expected [" .. desiredMutation .. "], but got [" .. actualMutation .. "]. Rejoining...")
+                -- FAILURE: Found the wrong one. Rejoin NOW.
+                print("Incorrect mutation [" .. actualMutation .. "] detected. Rejoining immediately...")
                 TeleportService:Teleport(game.PlaceId, LocalPlayer)
-                return true -- Signal to disconnect
             end
         else
-            -- This runs if getPetMutation returned nil (no mutation found)
-            print("Could not identify any mutation on the pet model. Rejoining to be safe...")
+            -- TIMEOUT: No attribute was found in time. Rejoin to be safe.
+            print("No mutation attribute found within the time limit. Rejoining...")
             TeleportService:Teleport(game.PlaceId, LocalPlayer)
-            return true -- Signal to disconnect
         end
+        
+        return true -- Signal to disconnect the listener
     end
-    return false -- Not the pet model, so we keep listening
+    return false
 end
 
-
 -- ===================================================================
---      MAIN LOGIC - DO NOT EDIT BELOW
+--      MAIN LOGIC
 -- ===================================================================
-print("Mutation reroller started. Desired mutation: " .. desiredMutation)
+print("Mutation reroller started for: " .. desiredMutation)
 
--- Create the event connection
 local connection
 connection = Camera.DescendantAdded:Connect(function(descendant)
     if onPetAdded(descendant) then
-        connection:Disconnect() -- Stop listening once our job is done
+        connection:Disconnect()
         print("Listener disconnected.")
     end
 end)
 
--- Fire the remote to claim the pet
-print("Claiming pet from the mutation machine...")
+print("Claiming pet...")
 PetMutationMachineService_RE:FireServer("ClaimMutatedPet")
