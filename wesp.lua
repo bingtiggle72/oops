@@ -1,10 +1,7 @@
---[[
-    Script: Pet Mutation Reroller (v3 - Stabilized)
-    Description: Adds a delay to prevent race conditions and includes detailed logging
-                 to accurately check pet attributes before rejoining.
-]]
+repeat
+    task.wait()
+until game:IsLoaded() and game:GetService("Players").LocalPlayer
 
--- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
