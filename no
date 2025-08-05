@@ -1,0 +1,107 @@
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+
+-- ===================================================================
+-- >> CONFIGURATION <<
+local desiredMutation = "Rainbow" -- <<-- SET YOUR DESIRED MUTATION HERE
+local WebhookURL = "https://discord.com/api/webhooks/1371121874800742471/TIC6Ym_dBvroflCDSdQP3O5aqiP6LI21FDjpFEEOzlOS0yCBakezem5KesmWoQry6jV8" -- <<-- PASTE YOUR WEBHOOK URL HERE
+
+-- ===================================================================
+
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local PetMutationMachineService_RE = ReplicatedStorage.GameEvents.PetMutationMachineService_RE
+
+-- Full list of possible mutations
+local allMutations = {
+    "Shiny", "Inverted", "Frozen", "Windy", "Mega", "Tiny", "Golden",
+    "Ironskin", "Rainbow", "Shocked", "Radiant", "Ascended"
+}
+
+-- The new, more compatible webhook function
+local function sendMutationWebhook(mutation, WebhookUrl)
+    if not WebhookUrl or WebhookUrl == "YOUR_WEBHOOK_URL_HERE" or WebhookUrl == "" then return end
+
+    local data = {
+        ["username"] = "Blackhub",
+        ["avatar_url"] = "https://cdn.discordapp.com/attachments/1063769792634425367/1307322910154690641/b48d30fd02a1b3c8534ed791344e7237.png",
+        ["content"] = "",
+        ["embeds"] = {{
+            ["title"] = "**🧬 Mutation Rolled 🧬**",
+            ["description"] = string.format("🎲 **Mutation:** `%s`", mutation or "Unknown"),
+            ["type"] = "rich",
+            ["color"] = tonumber("0x9b59b6"),
+            ["footer"] = {
+                ["text"] = "Blackhub - Auto Reroll",
+                ["icon_url"] = "https://cdn.discordapp.com/attachments/1063769792634425367/1307322910154690641/b48d30fd02a1b3c8534ed791344e7237.png"
+            },
+        }}
+    }
+
+    local payload = {
+        Url = WebhookUrl,
+        Body = HttpService:JSONEncode(data),
+        Method = "POST",
+        Headers = {["content-type"] = "application/json"}
+    }
+    
+    -- This line checks for many common executor request functions.
+    local request = http_request or request or HttpPost or (syn and syn.request)
+    if request then 
+        pcall(request, payload) 
+    end
+end
+
+
+-- Speed-optimized function to handle the pet
+local function onPetAdded(descendant)
+    if descendant:IsA("Model") and descendant.Parent == Camera then
+        local startTime = tick()
+        local timeLimit = 0.2
+        local actualMutation = nil
+
+        while tick() - startTime < timeLimit do
+            for _, mutationName in ipairs(allMutations) do
+                if descendant:GetAttribute(mutationName) == true then
+                    actualMutation = mutationName
+                    break
+                end
+            end
+            
+            if actualMutation then
+                break
+            end
+            
+            task.wait()
+        end
+        
+        if actualMutation then
+            if actualMutation == desiredMutation then
+                -- On success, call the new webhook function
+                sendMutationWebhook(actualMutation, WebhookURL)
+            else
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end
+        else
+            TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        end
+        
+        return true
+    end
+    return false
+end
+
+-- Main Logic
+local connection
+connection = Camera.DescendantAdded:Connect(function(descendant)
+    if onPetAdded(descendant) then
+        connection:Disconnect()
+    end
+end)
+
+PetMutationMachineService_RE:FireServer("ClaimMutatedPet")
