@@ -1,0 +1,86 @@
+local replicated_storage = game:GetService("ReplicatedStorage")
+local teleport_service = game:GetService("TeleportService")
+local players = game:GetService("Players")
+local workspace = game:GetService("Workspace")
+local http_service = game:GetService("HttpService")
+
+-- config
+local mutation_wanted = "Shiny"
+local webhook_url = "https://discord.com/api/webhooks/1371121874800742471/TIC6Ym_dBvroflCDSdQP3O5aqiP6LI21FDjpFEEOzlOS0yCBakezem5KesmWoQry6jV8"
+--
+
+local me = players.LocalPlayer
+local cam = workspace.CurrentCamera
+local remote = replicated_storage.GameEvents.PetMutationMachineService_RE
+
+local all_mutations = {
+    "Shiny", "Inverted", "Frozen", "Windy", "Mega", "Tiny", "Golden",
+    "Ironskin", "Rainbow", "Shocked", "Radiant", "Ascended"
+}
+
+local function send_hook(mutation)
+    if not webhook_url or webhook_url == "YOUR_WEBHOOK_URL_HERE" then return end
+
+    local data = {
+        username = "big black balls",
+        avatar_url = "https://cdn.discordapp.com/attachments/1390989755327578163/1402302319269253251/74f64afff9748d2c64d01b021ffcf288.jpg?ex=68936b4e&is=689219ce&hm=20eb278a5a2bb05dc6f87db1fd65f6514b09d1fe549813b1ebec606de26943a8&",
+        embeds = {{
+            title = "**:dna: Mutation Rolled :dna:**",
+            description = string.format(":game_die: **Mutation:** `%s`", mutation),
+            type = "rich",
+            color = 0x9b59b6,
+            footer = {
+                text = "Auto Reroll",
+                icon_url = "https://cdn.discordapp.com/attachments/1390989755327578163/1402302319269253251/74f64afff9748d2c64d01b021ffcf288.jpg?ex=68936b4e&is=689219ce&hm=20eb278a5a2bb05dc6f87db1fd65f6514b09d1fe549813b1ebec606de26943a8&"
+            },
+        }}
+    }
+    
+    local payload = {
+        Url = webhook_url,
+        Body = http_service:JSONEncode(data),
+        Method = "POST",
+        Headers = {["content-type"] = "application/json"}
+    }
+    
+    pcall(function()
+        local req = http_request or request or HttpPost or (syn and syn.request)
+        if req then req(payload) end
+    end)
+end
+
+local function check_pet(pet)
+    if pet:IsA("Model") and pet.Parent == cam then
+        local start = tick()
+        local time_limit = 0.2
+        local pet_mutation = nil
+
+        while tick() - start < time_limit do
+            for _, name in ipairs(all_mutations) do
+                if pet:GetAttribute(name) then
+                    pet_mutation = name
+                    break
+                end
+            end
+            if pet_mutation then break end
+            task.wait()
+        end
+        
+        if pet_mutation and pet_mutation == mutation_wanted then
+            send_hook(pet_mutation)
+        else
+            teleport_service:Teleport(game.PlaceId, me)
+        end
+        
+        return true
+    end
+end
+
+local conn
+conn = cam.DescendantAdded:Connect(function(child)
+    if check_pet(child) then
+        conn:Disconnect()
+    end
+end)
+
+remote:FireServer("ClaimMutatedPet")
